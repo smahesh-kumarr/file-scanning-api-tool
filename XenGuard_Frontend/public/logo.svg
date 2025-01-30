@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512px" height="512px" viewBox="0 0 512 512" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1A237E"/>
+            <stop offset="100%" style="stop-color:#0D47A1"/>
+        </linearGradient>
+    </defs>
+    <g stroke="none" fill="none">
+        <!-- Shield Base -->
+        <path d="M256,40 L448,120 L448,248 C448,369.2 366.4,480.8 256,512 C145.6,480.8 64,369.2 64,248 L64,120 L256,40 Z" 
+              fill="url(#gradient)"/>
+        
+        <!-- Network Lines -->
+        <g stroke="#FFFFFF" stroke-width="4" opacity="0.8">
+            <path d="M256,144 L352,208" />
+            <path d="M256,144 L160,208" />
+            <path d="M256,144 L256,304" />
+            <circle cx="256" cy="144" r="8" fill="#FFFFFF"/>
+            <circle cx="352" cy="208" r="8" fill="#FFFFFF"/>
+            <circle cx="160" cy="208" r="8" fill="#FFFFFF"/>
+            <circle cx="256" cy="304" r="8" fill="#FFFFFF"/>
+        </g>
+        
+        <!-- Lock Icon -->
+        <g transform="translate(208, 256)">
+            <rect x="0" y="24" width="96" height="72" rx="8" fill="#FFFFFF"/>
+            <path d="M24,24 L24,16 C24,7.2 31.2,0 40,0 L56,0 C64.8,0 72,7.2 72,16 L72,24" 
+                  stroke="#FFFFFF" 
+                  stroke-width="8"
+                  fill="none"/>
+        </g>
+    </g>
+</svg>

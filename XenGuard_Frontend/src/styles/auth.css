@@ -1,0 +1,162 @@
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.auth-container {
+  background-color: #f5f5f5;
+}
+
+.form-section {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.form-content {
+  animation: slideIn 0.5s ease-out;
+}
+
+.form-field {
+  transition: all 0.3s ease-in-out;
+}
+
+.form-field:focus-within {
+  transform: translateY(-2px);
+}
+
+.social-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.social-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove focus outline */
+* {
+  outline: none !important;
+}
+
+/* Custom focus styles */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #2196f3 !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1) !important;
+}
+
+/* Smooth button transitions */
+.MuiButton-root {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.MuiButton-root:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Input field hover effect */
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(33, 150, 243, 0.5) !important;
+}
+
+/* Checkbox animation */
+.MuiCheckbox-root {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.MuiCheckbox-root:hover {
+  background-color: rgba(33, 150, 243, 0.04) !important;
+}
+
+/* Form transition */
+.form-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.form-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.3s ease-out;
+}
+
+.form-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.form-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: all 0.3s ease-in;
+}
+
+.image-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.image-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(26, 35, 126, 0.9) 0%, rgba(13, 71, 161, 0.9) 100%);
+}
+
+.image-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/cyber-pattern.svg');
+  opacity: 0.1;
+  animation: pulse 4s infinite ease-in-out;
+}
+
+.floating-shield {
+  animation: float 6s infinite ease-in-out;
+}

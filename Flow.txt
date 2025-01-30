@@ -1,0 +1,5 @@
+1) Vite react setup 
+2) Start with the backend setup 
+   -> Node Js (npm init -y)
+   -> npm install express mongoose dotenv cors nodemon
+3) basic server in the "XenGuard-backend"
