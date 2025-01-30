@@ -12,6 +12,10 @@ import {
   IconButton,
   Tooltip,
   Input,
+  LinearProgress,
+  Card,
+  CardContent,
+  Divider,
 } from '@mui/material';
 import {
   Security as SecurityIcon,
@@ -19,6 +23,9 @@ import {
   Link as LinkIcon,
   Upload as UploadIcon,
   Info as InfoIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
 } from '@mui/icons-material';
 
 const XenSafe = () => {
@@ -143,6 +150,143 @@ const XenSafe = () => {
     }
   };
 
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'safe':
+        return <CheckCircleIcon sx={{ color: 'success.main', fontSize: 40 }} />;
+      case 'suspicious':
+        return <WarningIcon sx={{ color: 'warning.main', fontSize: 40 }} />;
+      case 'dangerous':
+        return <ErrorIcon sx={{ color: 'error.main', fontSize: 40 }} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderTrustScore = (score) => {
+    const normalizedScore = score || 0;
+    const color = normalizedScore > 70 ? 'success.main' 
+                : normalizedScore > 40 ? 'warning.main' 
+                : 'error.main';
+
+    return (
+      <Box sx={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+          <CircularProgress
+            variant="determinate"
+            value={100}
+            size={120}
+            thickness={4}
+            sx={{ color: 'grey.200' }}
+          />
+          <CircularProgress
+            variant="determinate"
+            value={normalizedScore}
+            size={120}
+            thickness={4}
+            sx={{
+              color: color,
+              position: 'absolute',
+              left: 0,
+            }}
+          />
+          <Box
+            sx={{
+              top: 0,
+              left: 0,
+              bottom: 0,
+              right: 0,
+              position: 'absolute',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Typography variant="h4" component="div" color={color}>
+              {normalizedScore}%
+            </Typography>
+          </Box>
+        </Box>
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 1 }}>
+          Trust Score
+        </Typography>
+      </Box>
+    );
+  };
+
+  const renderScanDetails = (details) => {
+    if (!details) return null;
+
+    return (
+      <Grid container spacing={3}>
+        {details.virusTotal && (
+          <Grid item xs={12} md={6}>
+            <Card variant="outlined">
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <SecurityIcon sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="h6">VirusTotal Analysis</Typography>
+                </Box>
+                <Box sx={{ width: '100%', mb: 2 }}>
+                  <Box display="flex" justifyContent="space-between" mb={1}>
+                    <Typography variant="body2" color="text.secondary">
+                      Security Vendors
+                    </Typography>
+                    <Typography variant="body2">
+                      {details.virusTotal.maliciousCount} / {details.virusTotal.totalEngines}
+                    </Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={(details.virusTotal.maliciousCount / details.virusTotal.totalEngines) * 100}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: 'success.light',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: 'error.main',
+                      }
+                    }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {details.urlscan && (
+          <Grid item xs={12} md={6}>
+            <Card variant="outlined">
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <SearchIcon sx={{ mr: 1, color: 'primary.main' }} />
+                  <Typography variant="h6">URL Analysis</Typography>
+                </Box>
+                {details.urlscan.verdict && (
+                  <Box>
+                    <Typography variant="body1" gutterBottom>
+                      Verdict: {details.urlscan.verdict}
+                    </Typography>
+                    {details.urlscan.scanUrl && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<InfoIcon />}
+                        onClick={() => window.open(details.urlscan.scanUrl, '_blank')}
+                      >
+                        View Full Report
+                      </Button>
+                    )}
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+      </Grid>
+    );
+  };
+
   return (
     <Box p={3}>
       <Paper elevation={3} sx={{ p: 3 }}>
@@ -204,70 +348,38 @@ const XenSafe = () => {
         )}
 
         {result && (
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="h6" component="h2">
-                    Scan Results
-                  </Typography>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{ color: getStatusColor(result.status) }}
-                  >
-                    ({result.status.toUpperCase()})
-                  </Typography>
-                </Box>
-              </Grid>
-
-              <Grid item xs={12}>
-                <Typography variant="body1" color="text.secondary">
-                  Trust Score: {result.score}%
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={4}>
+              <Box display="flex" alignItems="center" gap={2}>
+                {getStatusIcon(result.status)}
+                <Typography variant="h5" sx={{ color: getStatusColor(result.status) }}>
+                  Scan Results ({result.status.toUpperCase()})
                 </Typography>
+              </Box>
+            </Box>
+
+            <Grid container spacing={4}>
+              <Grid item xs={12} md={4} display="flex" justifyContent="center">
+                {renderTrustScore(result.score)}
               </Grid>
-
-              {result.threats.length > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                    Detected Threats:
-                  </Typography>
-                  {result.threats.map((threat, index) => (
-                    <Typography variant="body2" component="div" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      • {threat}
-                    </Typography>
-                  ))}
-                </Grid>
-              )}
-
-              {result.details && (
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                    Scan Details:
-                  </Typography>
-                  {result.details.virusTotal && (
-                    <Typography variant="body2">
-                      • VirusTotal: {result.details.virusTotal.maliciousCount} out of{' '}
-                      {result.details.virusTotal.totalEngines} security vendors flagged this
-                    </Typography>
-                  )}
-                  {result.details.phishTank && result.details.phishTank.inDatabase && (
-                    <Typography variant="body2">
-                      • PhishTank: {result.details.phishTank.verified ? 'Verified' : 'Suspected'} phishing site
-                      {result.details.phishTank.detailsUrl && (
-                        <Tooltip title="View details on PhishTank">
-                          <IconButton
-                            size="small"
-                            onClick={() => window.open(result.details.phishTank.detailsUrl, '_blank')}
-                          >
-                            <InfoIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Typography>
-                  )}
-                </Grid>
-              )}
+              <Grid item xs={12} md={8}>
+                {renderScanDetails(result.details)}
+              </Grid>
             </Grid>
+
+            {result.threats.length > 0 && (
+              <Box mt={4}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Detected Threats:
+                </Typography>
+                {result.threats.map((threat, index) => (
+                  <Alert key={index} severity="warning" sx={{ mb: 1 }}>
+                    {threat}
+                  </Alert>
+                ))}
+              </Box>
+            )}
           </Paper>
         )}
       </Paper>
