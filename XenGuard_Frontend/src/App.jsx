@@ -17,6 +17,7 @@ const ThreatLookup = React.lazy(() => import('./pages/lookup/ThreatLookup'));
 const Alerts = React.lazy(() => import('./pages/alerts/Alerts'));
 const Incidents = React.lazy(() => import('./pages/incidents/Incidents'));
 const Settings = React.lazy(() => import('./pages/settings/Settings'));
+const XenSafe = React.lazy(() => import('./pages/xensafe/XenSafe'));
 
 // Loading component
 const LoadingScreen = () => (
@@ -129,6 +130,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/xensafe"
+                element={
+                  <ProtectedRoute>
+                    <XenSafe />
                   </ProtectedRoute>
                 }
               />

@@ -13,6 +13,9 @@ import { Server } from 'socket.io';
 import threatRoutes from './routes/threatRoutes.js';
 import lookupRoutes from './routes/lookupRoutes.js';
 import ThreatMonitoringService from './services/threatMonitoringService.js';
+import fs from 'fs';
+import threatScanRoutes from './routes/threatScanRoutes.js';
+import alertRoutes from './routes/alertRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,18 +51,80 @@ const io = new Server(httpServer, {
 // Initialize threat monitoring service
 const threatMonitoring = new ThreatMonitoringService(io);
 
+// Create uploads directory if it doesn't exist
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? 'https://xenguard.com' : ['http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Log all incoming requests
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/threats", threatRoutes);
+app.use("/api/alerts", alertRoutes);
+app.use("/api/scan", threatScanRoutes);
 app.use("/api", lookupRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
+// 404 handler
+app.use((req, res) => {
+    console.error(`404 - Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({
+        success: false,
+        error: 'Endpoint not found'
+    });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        path: req.path,
+        method: req.method
+    });
+    
+    // Handle specific error types
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            success: false,
+            error: err.message
+        });
+    }
+    
+    if (err.name === 'UnauthorizedError') {
+        return res.status(401).json({
+            success: false,
+            error: 'Unauthorized access'
+        });
+    }
+    
+    // Default error response
+    res.status(err.status || 500).json({
+        success: false,
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+    });
+});
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
@@ -67,16 +132,6 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
-    });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error details:', err);
-    res.status(500).json({
-        success: false,
-        error: "Server Error",
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
     });
 });
 

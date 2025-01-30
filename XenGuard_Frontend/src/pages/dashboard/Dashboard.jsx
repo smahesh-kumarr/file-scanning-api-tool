@@ -80,6 +80,13 @@ const Dashboard = () => {
   
   const quickAccessItems = [
     {
+      title: 'XenSafe Mode',
+      description: 'Personal security tools for everyday users',
+      icon: SecurityIcon,
+      path: '/xensafe',
+      gradient: 'linear-gradient(135deg, #6B8EFF 0%, #536DFE 100%)',
+    },
+    {
       title: 'Active Threats',
       description: 'Monitor and manage current security threats',
       icon: SecurityIcon,

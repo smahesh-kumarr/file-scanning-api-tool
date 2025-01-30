@@ -169,38 +169,28 @@ const DashboardLayout = ({ children }) => {
         </DrawerHeader>
         <Divider />
         <List>
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            
+          {menuItems.map(({ text, icon: Icon, path }) => {
+            const isSelected = location.pathname === path;
+            const IconComponent = Icon;
             return (
               <ListItem
-                button
-                key={item.text}
-                onClick={() => navigate(item.path)}
+                key={text}
+                onClick={() => navigate(path)}
                 sx={{
-                  mb: 1,
-                  mx: 1,
-                  borderRadius: 1,
-                  ...(isActive && {
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
-                    '&:hover': {
-                      bgcolor: 'primary.dark',
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: 'inherit',
-                    },
-                  }),
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                  },
                 }}
               >
-                <ListItemIcon sx={{ color: isActive ? 'inherit' : 'primary.main' }}>
-                  <Icon />
+                <ListItemIcon>
+                  <IconComponent color={isSelected ? 'primary' : 'inherit'} />
                 </ListItemIcon>
                 <ListItemText 
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    fontWeight: isActive ? 'bold' : 'normal',
+                  primary={text} 
+                  sx={{ 
+                    color: isSelected ? 'primary.main' : 'inherit',
                   }}
                 />
               </ListItem>
