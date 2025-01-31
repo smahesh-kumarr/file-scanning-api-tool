@@ -31,12 +31,21 @@ class ThreatScanService {
                 throw new Error('VirusTotal API key is missing. Please check your environment variables.');
             }
 
+            // Always try VirusTotal first
             const vtResult = await this.submitToVirusTotal(url);
-            const urlscanResult = await this.submitToUrlscan(url);
+            let urlscanResult = null;
+            
+            try {
+                urlscanResult = await this.submitToUrlscan(url);
+            } catch (error) {
+                console.log('Urlscan.io scan failed:', error.message);
+                // If urlscan fails, we'll continue with just VirusTotal results
+            }
 
+            // Calculate scores - if urlscan fails, use only VirusTotal score
             const vtScore = vtResult ? this.calculateVirusTotalScore(vtResult) : 100;
-            const urlscanScore = urlscanResult ? this.calculateUrlscanScore(urlscanResult) : 100;
-            const overallScore = Math.min(vtScore, urlscanScore);
+            const urlscanScore = urlscanResult ? this.calculateUrlscanScore(urlscanResult) : vtScore;
+            const overallScore = urlscanResult ? Math.min(vtScore, urlscanScore) : vtScore;
 
             let status = 'SAFE';
             if (overallScore < 40) status = 'DANGEROUS';
@@ -64,7 +73,11 @@ class ThreatScanService {
                         verdict: urlscanResult.verdict,
                         scanUrl: urlscanResult.scanUrl,
                         verdictDetails: urlscanResult.verdictDetails
-                    } : null
+                    } : {
+                        verdict: 'scan_blocked',
+                        scanUrl: null,
+                        verdictDetails: 'URL scan was blocked by urlscan.io'
+                    }
                 }
             };
         } catch (error) {
@@ -154,6 +167,12 @@ class ThreatScanService {
                     }
                 }
             );
+
+            // If scan is prevented, throw a specific error
+            if (scanResponse.data.message === 'Scan prevented ...' || 
+                (scanResponse.data.description && scanResponse.data.description.includes('blocked from scanning'))) {
+                throw new Error('URL scan blocked by urlscan.io');
+            }
 
             const uuid = scanResponse.data.uuid;
             console.log('Urlscan scan submitted, uuid:', uuid);
