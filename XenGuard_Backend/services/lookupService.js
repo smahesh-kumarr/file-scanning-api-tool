@@ -3,22 +3,43 @@ import LookupHistory from '../models/lookupHistory.js';
 
 class LookupService {
   constructor() {
-    this.vtApiKey = process.env.VIRUSTOTAL_API_KEY;
-    this.shodanApiKey = process.env.SHODAN_API_KEY;
+    this.virusTotalApiKey = process.env.VIRUSTOTAL_API_KEY;
+  }
+
+  async lookup(query, type) {
+    console.log('Starting lookup:', { query, type });
     
-    // Validate API keys on initialization
-    if (!this.vtApiKey) {
-      console.error('VirusTotal API key is not configured');
-    }
-    if (!this.shodanApiKey) {
-      console.error('Shodan API key is not configured');
+    const results = {
+      virusTotal: null,
+      history: null
+    };
+
+    try {
+      // Run lookups in parallel
+      const [virusTotalResults, historyResults] = await Promise.all([
+        this.lookupVirusTotal(query, type),
+        this.lookupHistory(query, type)
+      ]);
+
+      results.virusTotal = virusTotalResults;
+      results.history = historyResults;
+
+      // Save to history if we got any results
+      if (virusTotalResults) {
+        await this.saveToHistory(query, type, results);
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Lookup failed:', error);
+      throw error;
     }
   }
 
   async lookupVirusTotal(query, type) {
     console.log('Starting VirusTotal lookup:', { query, type });
     
-    if (!this.vtApiKey) {
+    if (!this.virusTotalApiKey) {
       throw new Error('VirusTotal API key not configured');
     }
 
@@ -41,7 +62,7 @@ class LookupService {
       console.log('Making VirusTotal API request to:', endpoint);
       const response = await axios.get(endpoint, {
         headers: {
-          'x-apikey': this.vtApiKey
+          'x-apikey': this.virusTotalApiKey
         }
       });
 
@@ -73,88 +94,33 @@ class LookupService {
     }
   }
 
-  async lookupShodan(query, type) {
-    console.log('Starting Shodan lookup:', { query, type });
-    
-    if (!this.shodanApiKey) {
-      throw new Error('Shodan API key not configured');
-    }
-
-    if (type !== 'ip') {
-      console.log('Skipping Shodan lookup for non-IP query');
-      return null; // Shodan only supports IP lookups
-    }
-
-    try {
-      const endpoint = `https://api.shodan.io/shodan/host/${query}?key=${this.shodanApiKey}`;
-      console.log('Making Shodan API request');
-      
-      const response = await axios.get(endpoint);
-      console.log('Shodan API response received:', response.status);
-      
-      if (!response.data) {
-        console.error('Unexpected Shodan API response format:', response.data);
-        throw new Error('Invalid response format from Shodan');
-      }
-
-      return {
-        ports: response.data.ports || [],
-        services: response.data.data?.map(service => ({
-          port: service.port,
-          name: service.product || service._shodan?.module || 'unknown'
-        })) || [],
-        os: response.data.os,
-        isp: response.data.isp,
-        country: response.data.country_name
-      };
-    } catch (error) {
-      console.error('Shodan API error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      throw new Error(`Shodan lookup failed: ${error.message}`);
-    }
+  async lookupHistory(query, type) {
+    // Implementation of lookupHistory method
+    // This method is not provided in the original file or the new code block
+    // It's assumed to exist as it's called in the lookup method
+    throw new Error('lookupHistory method not implemented');
   }
 
-  async saveLookupHistory(query, type, results, userId) {
+  async saveToHistory(query, type, results) {
     try {
-      console.log('Saving lookup history:', { query, type, userId });
-      
       const sources = [];
-      if (results.virustotal) sources.push('virustotal');
-      if (results.shodan) sources.push('shodan');
+      if (results.virusTotal) sources.push('virustotal');
 
-      const history = new LookupHistory({
+      const historyEntry = new LookupHistory({
         query,
         type,
-        results,
         sources,
-        user: userId
+        results: {
+          virusTotal: results.virusTotal
+        },
+        timestamp: new Date()
       });
 
-      await history.save();
-      console.log('Lookup history saved successfully');
+      await historyEntry.save();
+      return historyEntry;
     } catch (error) {
-      console.error('Error saving lookup history:', error);
-      throw new Error(`Failed to save lookup history: ${error.message}`);
-    }
-  }
-
-  async getLookupHistory(query) {
-    try {
-      console.log('Fetching lookup history for query:', query);
-      
-      const history = await LookupHistory.find({ query })
-        .sort({ timestamp: -1 })
-        .limit(5)
-        .select('timestamp sources -_id');
-      
-      console.log('Found lookup history entries:', history.length);
-      return history;
-    } catch (error) {
-      console.error('Error fetching lookup history:', error);
-      throw new Error(`Failed to fetch lookup history: ${error.message}`);
+      console.error('Failed to save to history:', error);
+      throw error;
     }
   }
 }

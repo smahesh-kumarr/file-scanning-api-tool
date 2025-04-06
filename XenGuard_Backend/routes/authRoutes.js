@@ -30,7 +30,7 @@ router.post(
         console.log("Validation errors:", errors.array());
         return res.status(400).json({ 
           success: false,
-          errors: errors.array() 
+          error: errors.array()[0].msg
         });
       }
 
@@ -110,7 +110,7 @@ router.post(
         console.log("Validation errors:", errors.array());
         return res.status(400).json({ 
           success: false,
-          errors: errors.array() 
+          error: errors.array()[0].msg
         });
       }
 

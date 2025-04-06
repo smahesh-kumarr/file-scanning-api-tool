@@ -13,6 +13,8 @@ import {
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -35,22 +37,56 @@ const Register = () => {
     e.preventDefault();
     setError(null);
 
+    // Validate form data
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:3000/api/auth/register', {
+      console.log('Attempting to register user...');
+      const response = await axios.post(`${API_BASE_URL}/api/auth/signup`, {
         name: formData.name,
         email: formData.email,
         password: formData.password,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      navigate('/login', { state: { message: 'Registration successful! Please login.' } });
+
+      console.log('Registration response:', response.data);
+
+      if (response.data.success) {
+        navigate('/auth', { 
+          state: { 
+            message: 'Registration successful! Please login.',
+            email: formData.email 
+          } 
+        });
+      } else {
+        throw new Error(response.data.error || 'Registration failed');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', err);
+      setError(
+        err.response?.data?.error || 
+        err.response?.data?.message || 
+        err.message || 
+        'Registration failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -108,6 +144,7 @@ const Register = () => {
               autoFocus
               value={formData.name}
               onChange={handleChange}
+              disabled={loading}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -118,8 +155,10 @@ const Register = () => {
               label="Email Address"
               name="email"
               autoComplete="email"
+              type="email"
               value={formData.email}
               onChange={handleChange}
+              disabled={loading}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -132,6 +171,7 @@ const Register = () => {
               id="password"
               value={formData.password}
               onChange={handleChange}
+              disabled={loading}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -144,6 +184,7 @@ const Register = () => {
               id="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
+              disabled={loading}
               sx={{ mb: 3 }}
             />
             <Button
@@ -176,7 +217,7 @@ const Register = () => {
             <Box sx={{ textAlign: 'center' }}>
               <Link
                 component={RouterLink}
-                to="/login"
+                to="/auth"
                 variant="body2"
                 sx={{
                   textDecoration: 'none',

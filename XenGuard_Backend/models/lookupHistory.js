@@ -3,22 +3,20 @@ import mongoose from 'mongoose';
 const lookupHistorySchema = new mongoose.Schema({
   query: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   type: {
     type: String,
-    enum: ['ip', 'domain', 'hash'],
-    required: true
-  },
-  results: {
-    virustotal: Object,
-    shodan: Object
+    required: true,
+    enum: ['ip', 'domain', 'hash']
   },
   sources: [{
     type: String,
-    enum: ['virustotal', 'shodan']
+    enum: ['virustotal']
   }],
+  results: {
+    virusTotal: Object
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -33,6 +31,4 @@ const lookupHistorySchema = new mongoose.Schema({
 // Index for efficient querying
 lookupHistorySchema.index({ query: 1, timestamp: -1 });
 
-const LookupHistory = mongoose.model('LookupHistory', lookupHistorySchema);
-
-export default LookupHistory;
+export default mongoose.model('LookupHistory', lookupHistorySchema);

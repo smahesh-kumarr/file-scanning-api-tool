@@ -24,14 +24,7 @@ const __dirname = dirname(__filename);
 dotenv.config();
 
 // Verify environment variables
-const requiredEnvVars = [
-  'JWT_SECRET',
-  'PORT',
-  'FRONTEND_URL',
-  'MONGODB_URI',
-  'VIRUSTOTAL_API_KEY',
-  'SHODAN_API_KEY'
-];
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'PORT'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -60,7 +53,7 @@ if (!fs.existsSync(uploadDir)) {
 // Middleware
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -97,32 +90,11 @@ app.use((req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        path: req.path,
-        method: req.method
-    });
-    
-    // Handle specific error types
-    if (err.name === 'ValidationError') {
-        return res.status(400).json({
-            success: false,
-            error: err.message
-        });
-    }
-    
-    if (err.name === 'UnauthorizedError') {
-        return res.status(401).json({
-            success: false,
-            error: 'Unauthorized access'
-        });
-    }
-    
-    // Default error response
-    res.status(err.status || 500).json({
+    console.error(err.stack);
+    res.status(500).json({
         success: false,
-        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+        error: 'Server Error',
+        message: err.message
     });
 });
 
@@ -136,21 +108,22 @@ io.on('connection', (socket) => {
 });
 
 // Connect to MongoDB
-async function connectDB(retries = 5) {
+async function connectDB() {
     try {
-        console.log('MongoDB URI:', process.env.MONGODB_URI);
+        console.log('MongoDB URI:', process.env.MONGO_URI);
         console.log('Attempting to connect to MongoDB...');
         
-        await mongoose.connect(process.env.MONGODB_URI);
+        await mongoose.connect(process.env.MONGO_URI);
         
         console.log('Connected to MongoDB successfully');
         
         // Test the connection
-        await mongoose.connection.db.admin().ping();
+        const db = mongoose.connection;
+        await db.collection('users').findOne({});
         console.log('MongoDB ping successful');
         
-        // List all collections
-        const collections = await mongoose.connection.db.listCollections().toArray();
+        // Log available collections
+        const collections = await db.db.listCollections().toArray();
         console.log('Available collections:', collections.map(c => c.name));
         
         // Start threat monitoring after database connection
@@ -164,13 +137,7 @@ async function connectDB(retries = 5) {
             code: err.code,
             stack: err.stack
         });
-        
-        if (retries > 0) {
-            console.log(`Retrying connection... (${retries} attempts remaining)`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            return connectDB(retries - 1);
-        }
-        throw err;
+        process.exit(1);
     }
 }
 
