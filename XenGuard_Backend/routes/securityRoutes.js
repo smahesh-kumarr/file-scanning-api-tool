@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import FormData from 'form-data';
 
 dotenv.config();
 
@@ -23,37 +24,61 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 32 * 1024 * 1024 // 32MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only specific file types
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'application/octet-stream' // For executables
+    ];
+
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Please upload a valid file.'));
+    }
+  }
+});
 
 // File Scan endpoint
 router.post('/scan-file', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return res.status(400).json({ 
+        error: 'No file uploaded',
+        details: 'Please select a file to scan'
+      });
     }
 
     const filePath = req.file.path;
     const fileBuffer = fs.readFileSync(filePath);
 
-    // Get file size in bytes
-    const fileSize = fileBuffer.length;
-
-    // Check if file is too large (VirusTotal has a 32MB limit)
-    if (fileSize > 32 * 1024 * 1024) {
-      fs.unlinkSync(filePath); // Clean up the uploaded file
-      return res.status(400).json({ error: 'File size exceeds 32MB limit' });
-    }
+    // Create form data for VirusTotal
+    const formData = new FormData();
+    formData.append('file', fileBuffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
 
     // Upload file to VirusTotal
-    const formData = new FormData();
-    formData.append('file', fileBuffer, req.file.originalname);
-
     const uploadResponse = await axios.post('https://www.virustotal.com/api/v3/files', 
       formData,
       {
         headers: {
           'x-apikey': process.env.VIRUS_SCAN_API_KEY,
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          ...formData.getHeaders()
         }
       }
     );
@@ -61,8 +86,8 @@ router.post('/scan-file', upload.single('file'), async (req, res) => {
     // Get the analysis ID
     const analysisId = uploadResponse.data.data.id;
 
-    // Wait for analysis to complete
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait for analysis to complete (VirusTotal recommends waiting 15-30 seconds)
+    await new Promise(resolve => setTimeout(resolve, 15000));
 
     // Get the analysis results
     const response = await axios.get(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
@@ -78,33 +103,114 @@ router.post('/scan-file', upload.single('file'), async (req, res) => {
     // Extract relevant data from VirusTotal response
     const analysis = response.data.data.attributes;
     
+    // Calculate threat level based on multiple factors
+    const maliciousCount = analysis.stats.malicious || 0;
+    const suspiciousCount = analysis.stats.suspicious || 0;
+    const totalEngines = Object.keys(analysis.results || {}).length;
+    
+    // Determine threat level
+    let threatLevel = 'safe';
+    if (maliciousCount > 0) {
+      const maliciousPercentage = (maliciousCount / totalEngines) * 100;
+      if (maliciousPercentage > 50) {
+        threatLevel = 'high';
+      } else if (maliciousPercentage > 20) {
+        threatLevel = 'medium';
+      } else {
+        threatLevel = 'low';
+      }
+    } else if (suspiciousCount > 0) {
+      threatLevel = 'suspicious';
+    }
+
+    // Extract detailed threat information
+    const threats = Object.entries(analysis.results || {})
+      .filter(([_, result]) => result.category === 'malicious' || result.category === 'suspicious')
+      .map(([engine, result]) => ({
+        engine,
+        category: result.category,
+        result: result.result,
+        method: result.method,
+        severity: result.category === 'malicious' ? 'high' : 'medium'
+      }));
+
     const result = {
-      status: analysis.stats.malicious > 0 ? 'unsafe' : 'safe',
+      status: threatLevel === 'safe' ? 'safe' : 'unsafe',
+      threatLevel,
       details: {
-        isSafe: analysis.stats.malicious === 0,
-        threatScore: analysis.stats.malicious,
+        isSafe: threatLevel === 'safe',
+        threatScore: maliciousCount,
+        suspiciousScore: suspiciousCount,
+        totalEngines,
         lastAnalysisDate: new Date().toISOString(),
-        reputation: analysis.stats.malicious > 0 ? 'Low' : 'High',
+        reputation: threatLevel === 'safe' ? 'High' : 'Low',
         securityChecks: {
-          malware: analysis.stats.malicious > 0 ? 'Detected' : 'Clean',
-          suspicious: analysis.stats.suspicious > 0 ? 'Detected' : 'Clean',
-          undetected: analysis.stats.undetected
+          malware: maliciousCount > 0 ? `${maliciousCount} detected` : 'Clean',
+          suspicious: suspiciousCount > 0 ? `${suspiciousCount} detected` : 'Clean',
+          undetected: analysis.stats.undetected || 0,
+          harmless: analysis.stats.harmless || 0
         },
         fileInfo: {
           name: req.file.originalname,
-          size: fileSize,
+          size: req.file.size,
           type: req.file.mimetype
         },
-        engines: analysis.results
+        threats: threats,
+        engineResults: Object.entries(analysis.results || {}).map(([engine, result]) => ({
+          engine,
+          category: result.category,
+          result: result.result,
+          method: result.method
+        }))
       }
     };
 
     res.json(result);
   } catch (error) {
     console.error('File Scan Error:', error.response?.data || error.message);
+    
+    // Clean up file if it exists
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (e) {
+        console.error('Error cleaning up file:', e);
+      }
+    }
+
+    // Handle specific errors
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'File too large',
+        details: 'File size exceeds 32MB limit'
+      });
+    }
+
+    if (error.message === 'Invalid file type. Please upload a valid file.') {
+      return res.status(400).json({ 
+        error: 'Invalid file type',
+        details: 'Please upload a valid file type (PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT)'
+      });
+    }
+
+    // Handle VirusTotal API errors
+    if (error.response?.status === 401) {
+      return res.status(500).json({ 
+        error: 'VirusTotal API Error',
+        details: 'Invalid API key. Please check your VirusTotal API configuration.'
+      });
+    }
+
+    if (error.response?.status === 429) {
+      return res.status(429).json({ 
+        error: 'Rate Limit Exceeded',
+        details: 'Too many requests to VirusTotal API. Please try again later.'
+      });
+    }
+
     res.status(500).json({ 
       error: 'Failed to scan file',
-      details: error.response?.data || error.message
+      details: error.response?.data?.error || error.message
     });
   }
 });

@@ -11,10 +11,12 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   CircularProgress,
   Paper,
   Chip,
+  LinearProgress,
+  Grid,
+  IconButton,
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
@@ -24,6 +26,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Description as FileIcon,
   Delete as DeleteIcon,
+  Error as ErrorIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
@@ -76,12 +79,15 @@ const FileUploadScan = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [isDragActive, setIsDragActive] = useState(false);
 
   const handleFileUpload = (event) => {
     const uploadedFile = event.target.files[0];
     if (uploadedFile) {
-      const fileType = uploadedFile.type;
-      const validTypes = [
+      // Validate file type
+      const allowedTypes = [
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -90,46 +96,45 @@ const FileUploadScan = () => {
         'application/vnd.ms-powerpoint',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'text/plain',
+        'application/octet-stream'
       ];
 
-      if (validTypes.includes(fileType)) {
-        setFile(uploadedFile);
-        setError(null);
-      } else {
-        setError('Please upload a valid file type (PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT)');
-        setFile(null);
+      if (!allowedTypes.includes(uploadedFile.type)) {
+        setError('Invalid file type');
+        setErrorDetails('Please upload a valid file type (PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT)');
+        return;
       }
+
+      // Validate file size (32MB limit)
+      if (uploadedFile.size > 32 * 1024 * 1024) {
+        setError('File too large');
+        setErrorDetails('File size exceeds 32MB limit');
+        return;
+      }
+
+      setFile(uploadedFile);
+      setError(null);
+      setErrorDetails(null);
+      setResult(null);
     }
   };
 
   const handleDrop = (event) => {
     event.preventDefault();
+    setIsDragActive(false);
     const droppedFile = event.dataTransfer.files[0];
     if (droppedFile) {
-      const fileType = droppedFile.type;
-      const validTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'text/plain',
-      ];
-
-      if (validTypes.includes(fileType)) {
-        setFile(droppedFile);
-        setError(null);
-      } else {
-        setError('Please upload a valid file type (PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT)');
-        setFile(null);
-      }
+      handleFileUpload({ target: { files: [droppedFile] } });
     }
   };
 
   const handleDragOver = (event) => {
     event.preventDefault();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragActive(false);
   };
 
   const handleRemoveFile = () => {
@@ -139,12 +144,15 @@ const FileUploadScan = () => {
 
   const handleScan = async () => {
     if (!file) {
-      setError('Please upload a file to scan');
+      setError('No file selected');
+      setErrorDetails('Please select a file to scan');
       return;
     }
 
     setLoading(true);
     setError(null);
+    setErrorDetails(null);
+    setProgress(0);
 
     try {
       const formData = new FormData();
@@ -153,28 +161,25 @@ const FileUploadScan = () => {
       const response = await axios.post('http://localhost:5000/api/security/scan-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setProgress(percentCompleted);
         }
       });
 
-      setResult(response.data);
+      if (response.data && response.data.status) {
+        setResult(response.data);
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to analyze file. Please try again.');
       console.error('File scan error:', err);
+      setError(err.response?.data?.error || 'Failed to scan file');
+      setErrorDetails(err.response?.data?.details || 'An error occurred while scanning the file. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case 'high':
-        return 'error.main';
-      case 'medium':
-        return 'warning.main';
-      case 'low':
-        return 'info.main';
-      default:
-        return 'text.primary';
+      setProgress(0);
     }
   };
 
@@ -216,134 +221,230 @@ const FileUploadScan = () => {
             <UploadBox
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              isDragActive={false}
+              onDragLeave={handleDragLeave}
+              isDragActive={isDragActive}
             >
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
                 id="file-upload"
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
               />
               <label htmlFor="file-upload">
-                <Box sx={{ cursor: 'pointer' }}>
-                  <UploadIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                  <Typography variant="h6" gutterBottom>
-                    Drop your file here or click to upload
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Supports PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT
-                  </Typography>
-                </Box>
+                <Button
+                  variant="contained"
+                  component="span"
+                  startIcon={<UploadIcon />}
+                  sx={{ mb: 2 }}
+                >
+                  Select File
+                </Button>
               </label>
+              <Typography variant="body2" color="textSecondary">
+                or drag and drop files here
+              </Typography>
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT
+              </Typography>
             </UploadBox>
 
             {file && (
               <FilePreview>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FileIcon sx={{ mr: 2, color: 'primary.main' }} />
+                  <FileIcon sx={{ mr: 2 }} />
                   <Box>
-                    <Typography variant="subtitle1">{file.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2">{file.name}</Typography>
+                    <Typography variant="caption" color="textSecondary">
                       {formatFileSize(file.size)}
                     </Typography>
                   </Box>
                 </Box>
-                <Button
-                  startIcon={<DeleteIcon />}
-                  onClick={handleRemoveFile}
-                  color="error"
-                >
-                  Remove
-                </Button>
+                <IconButton onClick={handleRemoveFile} size="small">
+                  <DeleteIcon />
+                </IconButton>
               </FilePreview>
             )}
 
-            {error && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {error}
+            {(error || errorDetails) && (
+              <Alert 
+                severity="error" 
+                sx={{ mt: 2 }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                  {error}
+                </Typography>
+                {errorDetails && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    {errorDetails}
+                  </Typography>
+                )}
               </Alert>
             )}
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleScan}
-                disabled={loading || !file}
-                startIcon={loading ? <CircularProgress size={20} /> : <SecurityIcon />}
-              >
-                {loading ? 'Scanning...' : 'Scan File'}
-              </Button>
-            </Box>
+            {loading && (
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress variant="determinate" value={progress} />
+                <Typography variant="body2" sx={{ mt: 1, textAlign: 'center' }}>
+                  Scanning file... {progress}%
+                </Typography>
+              </Box>
+            )}
+
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={handleScan}
+              disabled={!file || loading}
+              startIcon={loading ? <CircularProgress size={20} /> : <SecurityIcon />}
+              sx={{ mt: 2 }}
+            >
+              {loading ? 'Scanning...' : 'Scan File'}
+            </Button>
           </CardContent>
         </Card>
 
         {result && (
-          <ResultCard severity={result.isSafe ? 'success' : 'error'}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              {result.isSafe ? (
-                <CheckCircleIcon color="success" sx={{ mr: 2, fontSize: 30 }} />
+          <ResultCard severity={result.status === 'safe' ? 'success' : 'error'}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              {result.status === 'safe' ? (
+                <CheckCircleIcon color="success" sx={{ fontSize: 40, mr: 2 }} />
               ) : (
-                <WarningIcon color="error" sx={{ mr: 2, fontSize: 30 }} />
+                <WarningIcon color="error" sx={{ fontSize: 40, mr: 2 }} />
               )}
-              <Typography variant="h6">
-                {result.isSafe
-                  ? 'File is Safe'
-                  : `Threats Detected (${Math.round(result.confidence * 100)}% confidence)`}
-              </Typography>
+              <Box>
+                <Typography variant="h5">
+                  {result.status === 'safe' ? 'File is Safe' : 'File May Be Unsafe'}
+                </Typography>
+                {result.status !== 'safe' && (
+                  <Typography variant="subtitle1" color="error">
+                    Threat Level: {result.threatLevel.toUpperCase()}
+                  </Typography>
+                )}
+              </Box>
             </Box>
 
-            {!result.isSafe && (
-              <>
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  Detected Threats:
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom>
+                  File Information
                 </Typography>
                 <List>
-                  {result.threats.map((threat, index) => (
-                    <React.Fragment key={index}>
-                      <ListItem alignItems="flex-start">
+                  <ListItem>
+                    <ListItemText
+                      primary="Name"
+                      secondary={result.details.fileInfo.name}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="Size"
+                      secondary={formatFileSize(result.details.fileInfo.size)}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="Type"
+                      secondary={result.details.fileInfo.type}
+                    />
+                  </ListItem>
+                </List>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Security Analysis
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip
+                    label={`Malware: ${result.details.securityChecks.malware}`}
+                    color={result.details.securityChecks.malware === 'Clean' ? 'success' : 'error'}
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Suspicious: ${result.details.securityChecks.suspicious}`}
+                    color={result.details.securityChecks.suspicious === 'Clean' ? 'success' : 'warning'}
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Total Engines: ${result.details.totalEngines}`}
+                    color="info"
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Threat Score: ${result.details.threatScore}`}
+                    color={result.details.threatScore > 0 ? 'error' : 'success'}
+                    sx={{ m: 0.5 }}
+                  />
+                </Box>
+              </Grid>
+
+              {result.details.threats && result.details.threats.length > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Detected Threats
+                  </Typography>
+                  <List>
+                    {result.details.threats.map((threat, index) => (
+                      <ListItem key={index}>
                         <ListItemIcon>
-                          <WarningIcon sx={{ color: getSeverityColor(threat.severity) }} />
+                          <ErrorIcon color={threat.severity === 'high' ? 'error' : 'warning'} />
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              {threat.type}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="subtitle2">{threat.engine}</Typography>
                               <Chip
-                                label={threat.severity}
+                                label={threat.category}
                                 size="small"
-                                sx={{
-                                  ml: 1,
-                                  backgroundColor: getSeverityColor(threat.severity),
-                                  color: 'white',
-                                }}
+                                color={threat.severity === 'high' ? 'error' : 'warning'}
                               />
                             </Box>
                           }
-                          secondary={threat.description}
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                {threat.result}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Method: {threat.method}
+                              </Typography>
+                            </Box>
+                          }
                         />
                       </ListItem>
-                      {index < result.threats.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
-                </List>
+                    ))}
+                  </List>
+                </Grid>
+              )}
 
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  Recommendations:
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Analysis Details
                 </Typography>
-                <List>
-                  {result.recommendations.map((recommendation, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <SecurityIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText primary={recommendation} />
-                    </ListItem>
-                  ))}
-                </List>
-              </>
-            )}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip
+                    label={`Last Analysis: ${new Date(result.details.lastAnalysisDate).toLocaleString()}`}
+                    color="info"
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Reputation: ${result.details.reputation}`}
+                    color={result.details.reputation === 'High' ? 'success' : 'error'}
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Undetected: ${result.details.securityChecks.undetected}`}
+                    color="default"
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Harmless: ${result.details.securityChecks.harmless}`}
+                    color="success"
+                    sx={{ m: 0.5 }}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
           </ResultCard>
         )}
       </Box>
