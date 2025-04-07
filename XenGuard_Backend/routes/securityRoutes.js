@@ -336,4 +336,293 @@ router.post('/scan-url', async (req, res) => {
   }
 });
 
+// Hash Scan endpoint
+router.post('/scan-hash', async (req, res) => {
+  try {
+    const { hash } = req.body;
+
+    if (!hash) {
+      return res.status(400).json({ 
+        error: 'Hash is required',
+        details: 'Please provide a hash to scan'
+      });
+    }
+
+    // Validate hash format (MD5, SHA-1, or SHA-256)
+    const hashRegex = /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/;
+    if (!hashRegex.test(hash)) {
+      return res.status(400).json({ 
+        error: 'Invalid hash format',
+        details: 'Please provide a valid MD5 (32 chars), SHA-1 (40 chars), or SHA-256 (64 chars) hash'
+      });
+    }
+
+    // Get hash report from VirusTotal
+    const response = await axios.get(`https://www.virustotal.com/api/v3/files/${hash}`, {
+      headers: {
+        'x-apikey': process.env.VIRUS_SCAN_API_KEY,
+        'Accept': 'application/json'
+      }
+    });
+
+    // Extract relevant data from VirusTotal response
+    const data = response.data.data;
+    const attributes = data.attributes;
+    
+    // Calculate threat level based on multiple factors
+    const maliciousCount = attributes.last_analysis_stats.malicious || 0;
+    const suspiciousCount = attributes.last_analysis_stats.suspicious || 0;
+    const totalEngines = Object.keys(attributes.last_analysis_results || {}).length;
+    
+    // Determine threat level
+    let threatLevel = 'safe';
+    if (maliciousCount > 0) {
+      const maliciousPercentage = (maliciousCount / totalEngines) * 100;
+      if (maliciousPercentage > 50) {
+        threatLevel = 'high';
+      } else if (maliciousPercentage > 20) {
+        threatLevel = 'medium';
+      } else {
+        threatLevel = 'low';
+      }
+    } else if (suspiciousCount > 0) {
+      threatLevel = 'suspicious';
+    }
+
+    // Extract detailed threat information
+    const threats = Object.entries(attributes.last_analysis_results || {})
+      .filter(([_, result]) => result.category === 'malicious' || result.category === 'suspicious')
+      .map(([engine, result]) => ({
+        engine,
+        category: result.category,
+        result: result.result,
+        method: result.method,
+        severity: result.category === 'malicious' ? 'high' : 'medium'
+      }));
+
+    const result = {
+      status: threatLevel === 'safe' ? 'safe' : 'unsafe',
+      threatLevel,
+      details: {
+        isSafe: threatLevel === 'safe',
+        threatScore: maliciousCount,
+        suspiciousScore: suspiciousCount,
+        totalEngines,
+        lastAnalysisDate: attributes.last_analysis_date,
+        reputation: threatLevel === 'safe' ? 'High' : 'Low',
+        securityChecks: {
+          malware: maliciousCount > 0 ? `${maliciousCount} detected` : 'Clean',
+          suspicious: suspiciousCount > 0 ? `${suspiciousCount} detected` : 'Clean',
+          undetected: attributes.last_analysis_stats.undetected || 0,
+          harmless: attributes.last_analysis_stats.harmless || 0
+        },
+        fileInfo: {
+          name: attributes.meaningful_name || 'Unknown',
+          size: attributes.size || 0,
+          type: attributes.type_description || 'Unknown',
+          md5: attributes.md5,
+          sha1: attributes.sha1,
+          sha256: attributes.sha256
+        },
+        threats: threats,
+        engineResults: Object.entries(attributes.last_analysis_results || {}).map(([engine, result]) => ({
+          engine,
+          category: result.category,
+          result: result.result,
+          method: result.method
+        })),
+        additionalInfo: {
+          firstSeen: attributes.first_seen_itw_date,
+          lastSeen: attributes.last_seen_itw_date,
+          tags: attributes.tags || [],
+          names: attributes.names || []
+        }
+      }
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Hash Scan Error:', error.response?.data || error.message);
+
+    // Handle specific VirusTotal API errors
+    if (error.response?.status === 404) {
+      return res.status(404).json({ 
+        error: 'Hash not found',
+        details: 'The provided hash was not found in VirusTotal database'
+      });
+    }
+
+    if (error.response?.status === 401) {
+      return res.status(500).json({ 
+        error: 'VirusTotal API Error',
+        details: 'Invalid API key. Please check your VirusTotal API configuration.'
+      });
+    }
+
+    if (error.response?.status === 429) {
+      return res.status(429).json({ 
+        error: 'Rate Limit Exceeded',
+        details: 'Too many requests to VirusTotal API. Please try again later.'
+      });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to scan hash',
+      details: error.response?.data?.error || error.message
+    });
+  }
+});
+
+// Phishing Scan endpoint
+router.post('/scan-phishing', async (req, res) => {
+  try {
+    const { content, url } = req.body;
+
+    if (!content && !url) {
+      return res.status(400).json({ 
+        error: 'Content or URL required',
+        details: 'Please provide either email content or URL to analyze'
+      });
+    }
+
+    let results = {
+      status: 'safe',
+      threatLevel: 'low',
+      details: {
+        isSafe: true,
+        threatScore: 0,
+        totalChecks: 0,
+        securityChecks: {
+          phishing: 'Clean',
+          suspicious: 'Clean',
+          malware: 'Clean'
+        },
+        analysis: []
+      }
+    };
+
+    // If URL is provided, check against PhishTank
+    if (url) {
+      try {
+        const phishTankResponse = await axios.get(`https://checkurl.phishtank.com/checkurl/`, {
+          params: {
+            url: url,
+            format: 'json',
+            app_key: process.env.PHISHTANK_API_KEY
+          }
+        });
+
+        if (phishTankResponse.data.results.in_database) {
+          results.status = 'unsafe';
+          results.threatLevel = 'high';
+          results.details.isSafe = false;
+          results.details.threatScore += 100;
+          results.details.securityChecks.phishing = 'Detected';
+          results.details.analysis.push({
+            source: 'PhishTank',
+            result: 'Known phishing URL',
+            confidence: 'High',
+            details: phishTankResponse.data.results
+          });
+        }
+      } catch (error) {
+        console.error('PhishTank API Error:', error);
+      }
+    }
+
+    // Analyze content for suspicious patterns
+    if (content) {
+      const suspiciousPatterns = [
+        { pattern: /password/i, weight: 0.3 },
+        { pattern: /login/i, weight: 0.2 },
+        { pattern: /account/i, weight: 0.2 },
+        { pattern: /verify/i, weight: 0.2 },
+        { pattern: /urgent/i, weight: 0.3 },
+        { pattern: /immediate/i, weight: 0.3 },
+        { pattern: /click here/i, weight: 0.4 },
+        { pattern: /http[s]?:\/\/[^\s]+/i, weight: 0.5 },
+        { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i, weight: 0.3 }
+      ];
+
+      let contentScore = 0;
+      const foundPatterns = [];
+
+      suspiciousPatterns.forEach(pattern => {
+        if (pattern.pattern.test(content)) {
+          contentScore += pattern.weight;
+          foundPatterns.push({
+            pattern: pattern.pattern.toString(),
+            weight: pattern.weight
+          });
+        }
+      });
+
+      if (contentScore > 0.5) {
+        results.status = 'suspicious';
+        results.threatLevel = 'medium';
+        results.details.threatScore += Math.round(contentScore * 100);
+        results.details.securityChecks.suspicious = 'Detected';
+        results.details.analysis.push({
+          source: 'Content Analysis',
+          result: 'Suspicious patterns detected',
+          confidence: 'Medium',
+          details: {
+            score: contentScore,
+            patterns: foundPatterns
+          }
+        });
+      }
+    }
+
+    // If URL is provided, also check with VirusTotal
+    if (url) {
+      try {
+        const virusTotalResponse = await axios.get(`https://www.virustotal.com/api/v3/urls/${Buffer.from(url).toString('base64').replace(/=/g, '')}`, {
+          headers: {
+            'x-apikey': process.env.VIRUS_SCAN_API_KEY
+          }
+        });
+
+        const stats = virusTotalResponse.data.data.attributes.last_analysis_stats;
+        if (stats.malicious > 0) {
+          results.status = 'unsafe';
+          results.threatLevel = 'high';
+          results.details.isSafe = false;
+          results.details.threatScore += stats.malicious * 20;
+          results.details.securityChecks.malware = `${stats.malicious} detections`;
+          results.details.analysis.push({
+            source: 'VirusTotal',
+            result: 'Malicious URL detected',
+            confidence: 'High',
+            details: {
+              malicious: stats.malicious,
+              suspicious: stats.suspicious,
+              total: stats.malicious + stats.suspicious + stats.harmless + stats.undetected
+            }
+          });
+        }
+      } catch (error) {
+        console.error('VirusTotal API Error:', error);
+      }
+    }
+
+    // Calculate final threat level
+    if (results.details.threatScore > 100) {
+      results.threatLevel = 'high';
+    } else if (results.details.threatScore > 50) {
+      results.threatLevel = 'medium';
+    }
+
+    results.details.totalChecks = results.details.analysis.length;
+
+    res.json(results);
+  } catch (error) {
+    console.error('Phishing Scan Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to analyze content',
+      details: error.message
+    });
+  }
+});
+
 export default router; 

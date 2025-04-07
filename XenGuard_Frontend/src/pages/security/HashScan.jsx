@@ -3,7 +3,6 @@ import {
   Box,
   Container,
   Typography,
-  TextField,
   Button,
   Card,
   CardContent,
@@ -12,29 +11,29 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   CircularProgress,
   Paper,
   Chip,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
+  TextField,
+  Grid,
   IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
-  Fingerprint as HashIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
   Security as SecurityIcon,
   ArrowBack as ArrowBackIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
   ContentCopy as CopyIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
+import axios from 'axios';
 
 const StyledCard = styled(Card)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #805AD5 0%, #6B46C1 100%)',
+  background: 'linear-gradient(135deg, #2D3748 0%, #1A202C 100%)',
   color: 'white',
   marginBottom: theme.spacing(3),
 }));
@@ -52,118 +51,60 @@ const ResultCard = styled(Paper)(({ theme, severity }) => ({
 
 const HashScan = () => {
   const navigate = useNavigate();
-  const [hashType, setHashType] = useState('md5');
-  const [hashValue, setHashValue] = useState('');
+  const [hash, setHash] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
 
-  const handleHashTypeChange = (event) => {
-    setHashType(event.target.value);
-    setResult(null);
+  const handleHashChange = (event) => {
+    setHash(event.target.value.trim());
     setError(null);
+    setErrorDetails(null);
+    setResult(null);
   };
 
-  const handleHashInput = (event) => {
-    const value = event.target.value;
-    setHashValue(value);
-    setResult(null);
-    setError(null);
-  };
-
-  const validateHash = (hash, type) => {
-    const patterns = {
-      md5: /^[a-f0-9]{32}$/i,
-      sha1: /^[a-f0-9]{40}$/i,
-      sha256: /^[a-f0-9]{64}$/i,
-    };
-
-    if (!patterns[type].test(hash)) {
-      setError(`Please enter a valid ${type.toUpperCase()} hash`);
-      return false;
-    }
-    return true;
+  const handleCopyHash = () => {
+    navigator.clipboard.writeText(hash);
   };
 
   const handleScan = async () => {
-    if (!hashValue.trim()) {
-      setError('Please enter a hash value');
+    if (!hash) {
+      setError('Hash is required');
+      setErrorDetails('Please enter a hash to scan');
       return;
     }
 
-    if (!validateHash(hashValue, hashType)) {
+    // Validate hash format
+    const hashRegex = /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/;
+    if (!hashRegex.test(hash)) {
+      setError('Invalid hash format');
+      setErrorDetails('Please enter a valid MD5 (32 chars), SHA-1 (40 chars), or SHA-256 (64 chars) hash');
       return;
     }
 
     setLoading(true);
     setError(null);
+    setErrorDetails(null);
 
     try {
-      // Simulated API call - replace with actual VirusTotal API implementation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulated response - replace with actual VirusTotal API response
-      const mockResponse = {
-        isMalicious: true,
-        confidence: 0.95,
-        detectionCount: 45,
-        totalScanners: 70,
-        firstSeen: '2023-01-15T08:30:00Z',
-        lastSeen: '2023-04-05T14:22:00Z',
-        detections: [
-          {
-            engine: 'Kaspersky',
-            result: 'Trojan.Win32.Generic',
-            severity: 'high',
-          },
-          {
-            engine: 'Microsoft',
-            result: 'Trojan:Win32/Wacatac.B!ml',
-            severity: 'high',
-          },
-          {
-            engine: 'ESET-NOD32',
-            result: 'Win32/Agent.ABX',
-            severity: 'medium',
-          },
-        ],
-        fileInfo: {
-          type: 'PE32 executable (GUI) Intel 80386, for MS Windows',
-          size: '2.5 MB',
-          tags: ['executable', 'windows', 'malicious'],
-        },
-        recommendations: [
-          'Do not download or execute this file',
-          'Delete the file if already downloaded',
-          'Run a full system scan',
-          'Update your antivirus definitions',
-        ],
-      };
-
-      setResult(mockResponse);
+      const response = await axios.post('http://localhost:5000/api/security/scan-hash', { hash });
+      setResult(response.data);
     } catch (err) {
-      setError('Failed to analyze hash. Please try again.');
       console.error('Hash scan error:', err);
+      setError(err.response?.data?.error || 'Failed to scan hash');
+      setErrorDetails(err.response?.data?.details || 'An error occurred while scanning the hash. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case 'high':
-        return 'error.main';
-      case 'medium':
-        return 'warning.main';
-      case 'low':
-        return 'info.main';
-      default:
-        return 'text.primary';
-    }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(hashValue);
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -182,11 +123,11 @@ const HashScan = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <SecurityIcon sx={{ fontSize: 40, mr: 2 }} />
               <Typography variant="h4" component="h1">
-                Hash Scanner
+                Hash Security Scanner
               </Typography>
             </Box>
             <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-              Check file hashes against VirusTotal's database
+              Enter a file hash (MD5, SHA-1, or SHA-256) to check its security status
             </Typography>
           </CardContent>
         </StyledCard>
@@ -194,170 +135,220 @@ const HashScan = () => {
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ mb: 3 }}>
-              <FormControl fullWidth>
-                <InputLabel>Hash Type</InputLabel>
-                <Select
-                  value={hashType}
-                  onChange={handleHashTypeChange}
-                  label="Hash Type"
-                >
-                  <MenuItem value="md5">MD5</MenuItem>
-                  <MenuItem value="sha1">SHA-1</MenuItem>
-                  <MenuItem value="sha256">SHA-256</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            <Box sx={{ position: 'relative' }}>
               <TextField
                 fullWidth
-                label={`Enter ${hashType.toUpperCase()} Hash`}
+                label="Enter Hash"
                 variant="outlined"
-                value={hashValue}
-                onChange={handleHashInput}
-                error={!!error}
-                helperText={error}
-                disabled={loading}
-                placeholder={`Paste your ${hashType.toUpperCase()} hash here...`}
-                sx={{ mb: 2 }}
-              />
-              <IconButton
-                onClick={copyToClipboard}
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: 8,
-                  color: 'primary.main',
+                value={hash}
+                onChange={handleHashChange}
+                placeholder="e.g., 44d88612fea8a8f36de82e1278abb02f"
+                InputProps={{
+                  endAdornment: (
+                    <IconButton onClick={handleCopyHash} disabled={!hash}>
+                      <CopyIcon />
+                    </IconButton>
+                  ),
                 }}
-              >
-                <CopyIcon />
-              </IconButton>
+                helperText="Enter MD5 (32 chars), SHA-1 (40 chars), or SHA-256 (64 chars) hash"
+              />
             </Box>
 
-            {error && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {error}
+            {(error || errorDetails) && (
+              <Alert 
+                severity="error" 
+                sx={{ mb: 2 }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                  {error}
+                </Typography>
+                {errorDetails && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    {errorDetails}
+                  </Typography>
+                )}
               </Alert>
             )}
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleScan}
-                disabled={loading || !hashValue.trim()}
-                startIcon={loading ? <CircularProgress size={20} /> : <HashIcon />}
-              >
-                {loading ? 'Scanning...' : 'Scan Hash'}
-              </Button>
-            </Box>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={handleScan}
+              disabled={!hash || loading}
+              startIcon={loading ? <CircularProgress size={20} /> : <SecurityIcon />}
+            >
+              {loading ? 'Scanning...' : 'Scan Hash'}
+            </Button>
           </CardContent>
         </Card>
 
         {result && (
-          <ResultCard severity={result.isMalicious ? 'error' : 'success'}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              {result.isMalicious ? (
-                <WarningIcon color="error" sx={{ mr: 2, fontSize: 30 }} />
+          <ResultCard severity={result.status === 'safe' ? 'success' : 'error'}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              {result.status === 'safe' ? (
+                <CheckCircleIcon color="success" sx={{ fontSize: 40, mr: 2 }} />
               ) : (
-                <CheckCircleIcon color="success" sx={{ mr: 2, fontSize: 30 }} />
+                <WarningIcon color="error" sx={{ fontSize: 40, mr: 2 }} />
               )}
-              <Typography variant="h6">
-                {result.isMalicious
-                  ? `Malicious Content Detected (${Math.round(result.confidence * 100)}% confidence)`
-                  : 'No Malicious Content Detected'}
-              </Typography>
+              <Box>
+                <Typography variant="h5">
+                  {result.status === 'safe' ? 'Hash is Safe' : 'Hash May Be Unsafe'}
+                </Typography>
+                {result.status !== 'safe' && (
+                  <Typography variant="subtitle1" color="error">
+                    Threat Level: {result.threatLevel.toUpperCase()}
+                  </Typography>
+                )}
+              </Box>
             </Box>
 
-            {result.isMalicious && (
-              <>
-                <Box sx={{ mt: 2, mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Detection Summary
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {result.detectionCount} out of {result.totalScanners} security vendors flagged this hash as malicious
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    First seen: {new Date(result.firstSeen).toLocaleDateString()}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Last seen: {new Date(result.lastSeen).toLocaleDateString()}
-                  </Typography>
-                </Box>
-
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  Detections:
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom>
+                  File Information
                 </Typography>
                 <List>
-                  {result.detections.map((detection, index) => (
-                    <React.Fragment key={index}>
-                      <ListItem alignItems="flex-start">
+                  <ListItem>
+                    <ListItemText
+                      primary="Name"
+                      secondary={result.details.fileInfo.name}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="Size"
+                      secondary={formatFileSize(result.details.fileInfo.size)}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="Type"
+                      secondary={result.details.fileInfo.type}
+                    />
+                  </ListItem>
+                </List>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Hash Information
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemText
+                      primary="MD5"
+                      secondary={result.details.fileInfo.md5}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="SHA-1"
+                      secondary={result.details.fileInfo.sha1}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText
+                      primary="SHA-256"
+                      secondary={result.details.fileInfo.sha256}
+                    />
+                  </ListItem>
+                </List>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Security Analysis
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip
+                    label={`Malware: ${result.details.securityChecks.malware}`}
+                    color={result.details.securityChecks.malware === 'Clean' ? 'success' : 'error'}
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Suspicious: ${result.details.securityChecks.suspicious}`}
+                    color={result.details.securityChecks.suspicious === 'Clean' ? 'success' : 'warning'}
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Total Engines: ${result.details.totalEngines}`}
+                    color="info"
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Threat Score: ${result.details.threatScore}`}
+                    color={result.details.threatScore > 0 ? 'error' : 'success'}
+                    sx={{ m: 0.5 }}
+                  />
+                </Box>
+              </Grid>
+
+              {result.details.threats && result.details.threats.length > 0 && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Detected Threats
+                  </Typography>
+                  <List>
+                    {result.details.threats.map((threat, index) => (
+                      <ListItem key={index}>
                         <ListItemIcon>
-                          <WarningIcon sx={{ color: getSeverityColor(detection.severity) }} />
+                          <ErrorIcon color={threat.severity === 'high' ? 'error' : 'warning'} />
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              {detection.engine}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="subtitle2">{threat.engine}</Typography>
                               <Chip
-                                label={detection.severity}
+                                label={threat.category}
                                 size="small"
-                                sx={{
-                                  ml: 1,
-                                  backgroundColor: getSeverityColor(detection.severity),
-                                  color: 'white',
-                                }}
+                                color={threat.severity === 'high' ? 'error' : 'warning'}
                               />
                             </Box>
                           }
-                          secondary={detection.result}
+                          secondary={
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                {threat.result}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Method: {threat.method}
+                              </Typography>
+                            </Box>
+                          }
                         />
                       </ListItem>
-                      {index < result.detections.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
-                </List>
+                    ))}
+                  </List>
+                </Grid>
+              )}
 
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  File Information:
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Additional Information
                 </Typography>
-                <List>
-                  <ListItem>
-                    <ListItemText
-                      primary="File Type"
-                      secondary={result.fileInfo.type}
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText
-                      primary="File Size"
-                      secondary={result.fileInfo.size}
-                    />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText
-                      primary="Tags"
-                      secondary={result.fileInfo.tags.join(', ')}
-                    />
-                  </ListItem>
-                </List>
-
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  Recommendations:
-                </Typography>
-                <List>
-                  {result.recommendations.map((recommendation, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <SecurityIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText primary={recommendation} />
-                    </ListItem>
-                  ))}
-                </List>
-              </>
-            )}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <Chip
+                    label={`First Seen: ${result.details.additionalInfo.firstSeen ? new Date(result.details.additionalInfo.firstSeen).toLocaleString() : 'Unknown'}`}
+                    color="info"
+                    sx={{ m: 0.5 }}
+                  />
+                  <Chip
+                    label={`Last Seen: ${result.details.additionalInfo.lastSeen ? new Date(result.details.additionalInfo.lastSeen).toLocaleString() : 'Unknown'}`}
+                    color="info"
+                    sx={{ m: 0.5 }}
+                  />
+                  {result.details.additionalInfo.tags && result.details.additionalInfo.tags.length > 0 && (
+                    result.details.additionalInfo.tags.map((tag, index) => (
+                      <Chip
+                        key={index}
+                        label={tag}
+                        color="default"
+                        sx={{ m: 0.5 }}
+                      />
+                    ))
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
           </ResultCard>
         )}
       </Box>
