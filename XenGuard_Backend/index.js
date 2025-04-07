@@ -16,6 +16,7 @@ import ThreatMonitoringService from './services/threatMonitoringService.js';
 import fs from 'fs';
 import threatScanRoutes from './routes/threatScanRoutes.js';
 import alertRoutes from './routes/alertRoutes.js';
+import securityRoutes from './routes/securityRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,6 +70,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/security", securityRoutes);
 app.use("/api/threats", threatRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/scan", threatScanRoutes);

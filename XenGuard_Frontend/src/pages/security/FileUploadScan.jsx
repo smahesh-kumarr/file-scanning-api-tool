@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
+import axios from 'axios';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   background: 'linear-gradient(135deg, #2D3748 0%, #1A202C 100%)',
@@ -146,47 +147,18 @@ const FileUploadScan = () => {
     setError(null);
 
     try {
-      // Simulated API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulated response - replace with actual API response
-      const mockResponse = {
-        isSafe: false,
-        confidence: 0.92,
-        threats: [
-          {
-            type: 'Malicious Code',
-            description: 'Contains potentially harmful executable code',
-            severity: 'high',
-          },
-          {
-            type: 'Suspicious Links',
-            description: 'Contains URLs that may lead to malicious websites',
-            severity: 'medium',
-          },
-          {
-            type: 'Macro Content',
-            description: 'Contains potentially dangerous macros',
-            severity: 'high',
-          },
-        ],
-        fileInfo: {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          lastModified: file.lastModified,
-        },
-        recommendations: [
-          'Do not open this file',
-          'Delete the file from your system',
-          'Report this file to your IT department',
-          'Run a full system scan',
-        ],
-      };
+      const formData = new FormData();
+      formData.append('file', file);
 
-      setResult(mockResponse);
+      const response = await axios.post('http://localhost:5000/api/security/scan-file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setResult(response.data);
     } catch (err) {
-      setError('Failed to analyze file. Please try again.');
+      setError(err.response?.data?.error || 'Failed to analyze file. Please try again.');
       console.error('File scan error:', err);
     } finally {
       setLoading(false);
