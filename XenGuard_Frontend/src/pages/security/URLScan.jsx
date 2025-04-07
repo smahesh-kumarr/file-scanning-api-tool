@@ -42,26 +42,44 @@ const URLScan = () => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
   const [result, setResult] = useState(null);
   const navigate = useNavigate();
 
   const handleScan = async () => {
     if (!url) {
-      setError('Please enter a URL to scan');
+      setError('URL is required');
+      setErrorDetails('Please enter a URL to scan');
       return;
     }
 
     // Validate URL format
     try {
-      new URL(url);
+      const urlObj = new URL(url);
+      
+      // Check if URL has a valid protocol
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        setError('Invalid URL protocol');
+        setErrorDetails('URL must start with http:// or https://');
+        return;
+      }
+
+      // Check if URL has a valid domain
+      if (!urlObj.hostname || urlObj.hostname.length < 3) {
+        setError('Invalid domain');
+        setErrorDetails('Please enter a valid domain name');
+        return;
+      }
     } catch (e) {
-      setError('Please enter a valid URL (e.g., https://example.com)');
+      setError('Invalid URL format');
+      setErrorDetails('Please enter a valid URL (e.g., https://example.com)');
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
+      setErrorDetails(null);
       setResult(null);
       
       const response = await axios.post('http://localhost:5000/api/security/scan-url', 
@@ -80,10 +98,10 @@ const URLScan = () => {
       }
     } catch (err) {
       console.error('Scan error:', err);
-      setError(
-        err.response?.data?.error || 
+      setError(err.response?.data?.error || 'Failed to scan URL');
+      setErrorDetails(
         err.response?.data?.details || 
-        'Failed to scan URL. Please try again.'
+        'An error occurred while scanning the URL. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -156,7 +174,7 @@ const URLScan = () => {
             />
           </Box>
 
-          {error && (
+          {(error || errorDetails) && (
             <Alert 
               severity="error" 
               sx={{ 
@@ -168,7 +186,14 @@ const URLScan = () => {
                 },
               }}
             >
-              {error}
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                {error}
+              </Typography>
+              {errorDetails && (
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                  {errorDetails}
+                </Typography>
+              )}
             </Alert>
           )}
 

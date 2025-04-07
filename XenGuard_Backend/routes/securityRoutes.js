@@ -118,11 +118,43 @@ router.post('/scan-url', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    // Validate URL format
+    // Validate URL format and structure
     try {
-      new URL(url);
+      const urlObj = new URL(url);
+      
+      // Check if URL has a valid protocol
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        return res.status(400).json({ 
+          error: 'Invalid URL protocol',
+          details: 'URL must start with http:// or https://'
+        });
+      }
+
+      // Check if URL has a valid domain
+      if (!urlObj.hostname || urlObj.hostname.length < 3) {
+        return res.status(400).json({ 
+          error: 'Invalid domain',
+          details: 'Please enter a valid domain name'
+        });
+      }
+
+      // Check if URL is accessible
+      try {
+        await axios.head(url, { timeout: 5000 });
+      } catch (error) {
+        if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+          return res.status(400).json({ 
+            error: 'URL not accessible',
+            details: 'The URL you entered is not accessible or does not exist. Please check the URL and try again.'
+          });
+        }
+      }
+
     } catch (e) {
-      return res.status(400).json({ error: 'Invalid URL format' });
+      return res.status(400).json({ 
+        error: 'Invalid URL format',
+        details: 'Please enter a valid URL (e.g., https://example.com)'
+      });
     }
 
     // First, submit the URL for analysis
@@ -175,9 +207,25 @@ router.post('/scan-url', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('URL Scan Error:', error.response?.data || error.message);
+    
+    // Handle specific VirusTotal API errors
+    if (error.response?.status === 404) {
+      return res.status(400).json({ 
+        error: 'URL not found',
+        details: 'The URL you entered could not be found. Please check the URL and try again.'
+      });
+    }
+    
+    if (error.response?.status === 429) {
+      return res.status(429).json({ 
+        error: 'Rate limit exceeded',
+        details: 'Too many requests. Please try again later.'
+      });
+    }
+
     res.status(500).json({ 
       error: 'Failed to scan URL',
-      details: error.response?.data || error.message
+      details: error.response?.data?.error || error.message
     });
   }
 });
