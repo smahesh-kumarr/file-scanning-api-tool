@@ -1,185 +1,191 @@
 import React from 'react';
-import { Box, Typography, Grid, Paper, Button, IconButton, Avatar } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  IconButton,
+} from '@mui/material';
 import {
   Security as SecurityIcon,
-  NotificationsActive as AlertsIcon,
-  BugReport as IncidentsIcon,
-  Settings as SettingsIcon,
-  ArrowForward as ArrowForwardIcon,
   Warning as WarningIcon,
+  NotificationsActive as AlertIcon,
+  BugReport as BugIcon,
+  Settings as SettingsIcon,
+  Link as LinkIcon,
+  Fingerprint as HashIcon,
+  CloudUpload,
+  PhishingOutlined as PhishingIcon,
+  MailOutline as EmailIcon,
 } from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 
-const QuickAccessCard = ({ title, description, icon: Icon, path, count, gradient }) => {
-  const navigate = useNavigate();
-  
-  return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        height: '100%',
-        background: gradient,
-        color: 'white',
-        position: 'relative',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        transition: 'transform 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-        },
-      }}
-      onClick={() => navigate(path)}
-    >
-      <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Avatar sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)', width: 48, height: 48 }}>
-            <Icon />
-          </Avatar>
-          {count !== undefined && (
-            <Typography variant="h4" fontWeight="bold">
-              {count}
-            </Typography>
-          )}
-        </Box>
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
-          {title}
-        </Typography>
-        <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
-          {description}
-        </Typography>
-        <Button
-          variant="text"
-          color="inherit"
-          endIcon={<ArrowForwardIcon />}
-          sx={{ 
-            pl: 0,
-            '&:hover': { bgcolor: 'transparent', opacity: 0.8 }
-          }}
-        >
-          View Details
-        </Button>
-      </Box>
-      <Box
-        sx={{
-          position: 'absolute',
-          right: -20,
-          bottom: -20,
-          opacity: 0.1,
-        }}
-      >
-        <Icon sx={{ fontSize: 140 }} />
-      </Box>
-    </Paper>
-  );
-};
+const StyledCard = styled(Card)(({ theme }) => ({
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+  cursor: 'pointer',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: theme.shadows[8],
+  },
+}));
+
+const IconWrapper = styled(Box)(({ theme, color }) => ({
+  backgroundColor: color || theme.palette.primary.main,
+  borderRadius: '50%',
+  padding: theme.spacing(1),
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: theme.spacing(1),
+  '& svg': {
+    color: '#fff',
+  },
+}));
 
 const Dashboard = () => {
-  const user = useSelector((state) => state.auth.user);
-  
-  const quickAccessItems = [
+  const navigate = useNavigate();
+
+  const dashboardItems = [
     {
       title: 'XenSafe Mode',
       description: 'Personal security tools for everyday users',
       icon: SecurityIcon,
+      color: '#4C51BF',
+      count: null,
       path: '/xensafe',
-      gradient: 'linear-gradient(135deg, #6B8EFF 0%, #536DFE 100%)',
     },
     {
       title: 'Active Threats',
       description: 'Monitor and manage current security threats',
-      icon: SecurityIcon,
-      path: '/threats',
+      icon: WarningIcon,
+      color: '#E53E3E',
       count: 12,
-      gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
+      path: '/threats',
     },
     {
       title: 'Recent Alerts',
       description: 'View and respond to security alerts',
-      icon: AlertsIcon,
-      path: '/alerts',
+      icon: AlertIcon,
+      color: '#38A169',
       count: 8,
-      gradient: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+      path: '/alerts',
     },
     {
       title: 'Open Incidents',
       description: 'Track and resolve security incidents',
-      icon: IncidentsIcon,
-      path: '/incidents',
+      icon: BugIcon,
+      color: '#3182CE',
       count: 3,
-      gradient: 'linear-gradient(135deg, #2196F3 0%, #1565C0 100%)',
+      path: '/incidents',
+    },
+    {
+      title: 'URL Scan',
+      description: 'Check URLs for security threats',
+      icon: LinkIcon,
+      color: '#2196F3',
+      count: null,
+      path: '/url-scan',
+    },
+    {
+      title: 'Hash Scan',
+      description: 'Check file hashes against threat databases',
+      icon: HashIcon,
+      color: '#D69E2E',
+      count: null,
+      path: '/hash-scan',
+    },
+    {
+      title: 'File Upload Scan',
+      description: 'Scan files for security threats',
+      icon: CloudUpload,
+      color: '#4299E1',
+      count: null,
+      path: '/file-upload-scan',
+    },
+    {
+      title: 'Phishing Scan',
+      description: 'Detect phishing attempts and scams',
+      icon: PhishingIcon,
+      color: '#63B3ED',
+      count: null,
+      path: '/phishing-scan',
+    },
+    {
+      title: 'Email Breach Scan',
+      description: 'Check if your email was compromised',
+      icon: EmailIcon,
+      color: '#9F7AEA',
+      count: null,
+      path: '/email-breach-scan',
     },
     {
       title: 'System Settings',
       description: 'Configure system preferences and security policies',
       icon: SettingsIcon,
+      color: '#6B46C1',
+      count: null,
       path: '/settings',
-      gradient: 'linear-gradient(135deg, #9C27B0 0%, #6A1B9A 100%)',
     },
   ];
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ mb: 6 }}>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ mb: 1 }}>
-          Welcome back, {user?.name || 'User'}! 👋
+          Welcome back, {localStorage.getItem('userName') || 'User'}! 👋
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography color="text.secondary">
           Here's what's happening in your security environment
         </Typography>
       </Box>
 
       <Grid container spacing={3}>
-        {quickAccessItems.map((item, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <QuickAccessCard {...item} />
+        {dashboardItems.map((item, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <StyledCard onClick={() => navigate(item.path)}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <IconWrapper color={item.color}>
+                    <item.icon />
+                  </IconWrapper>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="h6" component="div">
+                      {item.title}
+                    </Typography>
+                    {item.count !== null && (
+                      <Typography
+                        variant="h4"
+                        component="div"
+                        sx={{ fontWeight: 'bold', color: item.color }}
+                      >
+                        {item.count}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                <Typography color="text.secondary" variant="body2">
+                  {item.description}
+                </Typography>
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    size="small"
+                    endIcon={<item.icon />}
+                    sx={{ color: item.color }}
+                  >
+                    View Details
+                  </Button>
+                </Box>
+              </CardContent>
+            </StyledCard>
           </Grid>
         ))}
       </Grid>
-
-      <Box sx={{ mt: 6 }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>
-          Security Overview
-        </Typography>
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)',
-            color: 'white',
-          }}
-        >
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <WarningIcon sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h6">System Status</Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    All security systems are operating normally
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  sx={{
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    },
-                  }}
-                >
-                  View Security Report
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </Paper>
-      </Box>
     </Box>
   );
 };

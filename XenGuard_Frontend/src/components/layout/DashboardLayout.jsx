@@ -80,6 +80,7 @@ const DrawerHeader = styled('div')(({ theme }) => ({
 
 const menuItems = [
   { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard' },
+  { text: 'Security Tools', icon: SecurityIcon, path: '/security-tools' },
   { text: 'Threats', icon: SecurityIcon, path: '/threats' },
   { text: 'Threat Lookup', icon: SearchIcon, path: '/lookup' },
   { text: 'Alerts', icon: AlertsIcon, path: '/alerts' },

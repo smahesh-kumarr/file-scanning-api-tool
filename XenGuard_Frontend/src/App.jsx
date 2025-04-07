@@ -12,12 +12,18 @@ import './styles/auth.css';
 import React, { Suspense } from 'react';
 const AuthPage = React.lazy(() => import('./pages/auth/AuthPage'));
 const Dashboard = React.lazy(() => import('./pages/dashboard/Dashboard'));
+const SecurityTools = React.lazy(() => import('./pages/dashboard/SecurityTools'));
+const EmailBreachScan = React.lazy(() => import('./pages/security/EmailBreachScan'));
+const PhishingScan = React.lazy(() => import('./pages/security/PhishingScan'));
+const FileUploadScan = React.lazy(() => import('./pages/security/FileUploadScan'));
+const HashScan = React.lazy(() => import('./pages/security/HashScan'));
 const Threats = React.lazy(() => import('./pages/threats/Threats'));
 const ThreatLookup = React.lazy(() => import('./pages/lookup/ThreatLookup'));
 const Alerts = React.lazy(() => import('./pages/alerts/Alerts'));
 const Incidents = React.lazy(() => import('./pages/incidents/Incidents'));
 const Settings = React.lazy(() => import('./pages/settings/Settings'));
 const XenSafe = React.lazy(() => import('./pages/xensafe/XenSafe'));
+const URLScan = React.lazy(() => import('./pages/security/URLScan'));
 
 // Loading component
 const LoadingScreen = () => (
@@ -54,13 +60,7 @@ const AuthRoute = ({ children }) => {
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useSelector((state) => state.auth);
-  
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return isAuthenticated ? children : <Navigate to="/auth" />;
 };
 
 function App() {
@@ -89,7 +89,59 @@ function App() {
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardLayout>
+                      <Dashboard />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/security-tools"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <SecurityTools />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/email-breach-scan"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <EmailBreachScan />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/phishing-scan"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <PhishingScan />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/file-upload-scan"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <FileUploadScan />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hash-scan"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <HashScan />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -97,7 +149,9 @@ function App() {
                 path="/threats"
                 element={
                   <ProtectedRoute>
-                    <Threats />
+                    <DashboardLayout>
+                      <Threats />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -105,7 +159,9 @@ function App() {
                 path="/lookup"
                 element={
                   <ProtectedRoute>
-                    <ThreatLookup />
+                    <DashboardLayout>
+                      <ThreatLookup />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -113,7 +169,9 @@ function App() {
                 path="/alerts"
                 element={
                   <ProtectedRoute>
-                    <Alerts />
+                    <DashboardLayout>
+                      <Alerts />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -121,7 +179,9 @@ function App() {
                 path="/incidents"
                 element={
                   <ProtectedRoute>
-                    <Incidents />
+                    <DashboardLayout>
+                      <Incidents />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -129,7 +189,9 @@ function App() {
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <Settings />
+                    <DashboardLayout>
+                      <Settings />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
@@ -137,7 +199,19 @@ function App() {
                 path="/xensafe"
                 element={
                   <ProtectedRoute>
-                    <XenSafe />
+                    <DashboardLayout>
+                      <XenSafe />
+                    </DashboardLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/url-scan"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout>
+                      <URLScan />
+                    </DashboardLayout>
                   </ProtectedRoute>
                 }
               />
